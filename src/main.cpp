@@ -28,11 +28,14 @@ void abre_img(char nome[], Img& img);
 
 void salva_img(char nome[], Img img);
 
+void menu_principal();
+
 int main() {
-  char nome_arquivo[TAMANHO_MAXIMO_NOME_ARQUIVO];
+  menu_principal();
+  /* char nome_arquivo[TAMANHO_MAXIMO_NOME_ARQUIVO];
   Img imagem;
   abre_img(nome_arquivo, imagem);
-  salva_img(nome_arquivo, imagem);
+  salva_img(nome_arquivo, imagem); */
   return 0;
 }
 
@@ -101,5 +104,35 @@ void salva_img(char nome[], Img img) {
   }
   cout << "Nome do arquivo de saida: " << nome_saida << endl;
   arquivo_saida.close();
+}
+
+void menu_principal() {
+  bool rodar = true;
+  while (rodar) {
+    cout << "\nProcessador de imagens ADL\n\nEscolha uma funcao:\n\n";
+    cout << "[1] Negativo de imagem\n";
+    cout << "[2] Binarizacao de canais\n";
+    cout << "[0] Sair\n";
+    int escolha;
+    cin >> escolha;
+    switch(escolha) {
+      case 0:
+        rodar = false;
+        break;
+      case 1:
+        cout << "\nFuncao nao implementada\n";
+        break;
+      case 2:
+        cout << "\nFuncao nao implementada\n";
+        break;
+    }
+    cout << "\nDeseja continuar? (s, n)\n";
+    char escolha_saida;
+    cin >> escolha_saida;
+    if (escolha_saida != 's') {
+      rodar = false;
+    }
+  }
+  cout << "Ate a proxima\n";
 }
 
