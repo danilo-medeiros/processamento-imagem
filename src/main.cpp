@@ -30,14 +30,20 @@ int ler_escolha_menu();
 
 // Funcoes:
 
+void converte_para_cinza(Img img_in, Img& img_out);
 void computa_negativo(Img img_in, Img& img_out);
-void corta_rgb(Img& imagem, Img& img_saida, int li, int ci, int lf, int cf);
-void binariza_canal(Img& img_in, Img& img_out, int limiar);
-void diminui_tamanho(Img& img_in, Img& img_out);
-void reflete(Img& img_in, Img& img_out);
-void borra_imagem(Img& img_in, Img& img_out);
-void equaliza_histograma(Img& img_in, Img& img_out);
-void separa_canais(Img& img_in, Img& img_r, Img& img_g, Img& img_b);
+void binariza(Img img_in, Img& img_out, int limiar);
+void corta_rgb(Img imagem, Img& img_saida, int li, int ci, int lf, int cf);
+void binariza_canal(Img img_in, Img& img_out, int limiar);
+void solariza(Img img_in, Img& img_out, int limiar);
+void rotaciona(Img img_in, Img& img_out);
+void inverte(Img img_in, Img& img_out);
+void diminui_tamanho(Img img_in, Img& img_out);
+void reflete(Img img_in, Img& img_out, int indice);
+void borra_imagem(Img img_in, Img& img_out);
+void equaliza_histograma(Img img_in, Img& img_out);
+void separa_canais(Img img_in, Img& img_r, Img& img_g, Img& img_b);
+void aumenta_tamanho(Img img_in, Img& img_out);
 
 // Funcoes com mascaras:
 
@@ -141,7 +147,10 @@ int main() {
         break;
       case 6:
         abre_img(nome_arquivo, imagem);
-        reflete(imagem, img_saida);
+        cout << "Coluna de reflexao: \n";
+        int indice;
+        cin >> indice;
+        reflete(imagem, img_saida, indice);
         salva_img(nome_arquivo, img_saida);
         break;
       case 7:
@@ -154,6 +163,42 @@ int main() {
         equaliza_histograma(imagem, img_saida);
         salva_img(nome_arquivo, img_saida);
         break;
+      case 9:
+        abre_img(nome_arquivo, imagem);
+        converte_para_cinza(imagem, img_saida);
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 10:
+        abre_img(nome_arquivo, imagem);
+        cout << "Limiar: ";
+        int limiar_binariza;
+        cin >> limiar_binariza;
+        binariza(imagem, img_saida, limiar_binariza);
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 11:
+        abre_img(nome_arquivo, imagem);
+        cout << "Limiar: ";
+        int limiar_solariza;
+        cin >> limiar_solariza;
+        solariza(imagem, img_saida, limiar_solariza);
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 12:
+        abre_img(nome_arquivo, imagem);
+        rotaciona(imagem, img_saida);
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 13:
+        abre_img(nome_arquivo, imagem);
+        inverte(imagem, img_saida);
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 14:
+        abre_img(nome_arquivo, imagem);
+        aumenta_tamanho(imagem, img_saida);
+        salva_img(nome_arquivo, img_saida);
+        break;
       default:
         cout << "Opção inválida\n";
         break;
@@ -163,6 +208,7 @@ int main() {
   return 0;
 }
 
+// Abre arquivo salvo no computador na pasta imagens relativa ao projeto
 void abre_img(char nome[], Img& img) {
   fstream arquivo;
   char nome_arquivo[20];
@@ -239,10 +285,27 @@ int ler_escolha_menu() {
   cout << "[6] Reflexão horizontal/vertical na imagem (mirror)\n";
   cout << "[7] Convolução para filtragem passa baixas\n";
   cout << "[8] Equalização de histograma\n";
-  cout << "[0] Sair\n";
+  cout << "[9] Conversão para níveis de cinza\n";
+  cout << "[10] Binarização de imagem (preto e branco)\n";
+  cout << "[11] Solarização de imagem\n";
+  cout << "[12] Rotaciona\n";
+  cout << "[13] Inversão vertical na imagem (flip)\n";
+  cout << "[14] Aumento de tamanho da imagem\n";
+  cout << "[0] Sair\n\nSua opcao: ";
   int escolha;
   cin >> escolha;
   return escolha;
+}
+
+void converte_para_cinza(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_linhas;
+  img_out.qtd_colunas = img_in.qtd_colunas;
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      int media = (img_in.matriz[i][j].red + img_in.matriz[i][j].green + img_in.matriz[i][j].blue) / 3;
+      img_out.matriz[i][j] = { media, media, media };
+    }
+  }
 }
 
 void computa_negativo(Img img_in, Img& img_out) {
@@ -259,7 +322,19 @@ void computa_negativo(Img img_in, Img& img_out) {
   }
 }
 
-void corta_rgb(Img& imagem, Img& img_saida, int li, int ci, int lf, int cf) {
+void binariza(Img img_in, Img& img_out, int limiar) {
+  img_out.qtd_linhas = img_in.qtd_linhas;
+  img_out.qtd_colunas = img_in.qtd_colunas;
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      int media = (img_in.matriz[i][j].red + img_in.matriz[i][j].green + img_in.matriz[i][j].blue) / 3;
+      int valor_pixel = media < limiar ? 0 : 255;
+      img_out.matriz[i][j] = { valor_pixel, valor_pixel, valor_pixel };
+    }
+  }
+}
+
+void corta_rgb(Img imagem, Img& img_saida, int li, int ci, int lf, int cf) {
   img_saida.qtd_linhas = lf - li;
   img_saida.qtd_colunas = cf - ci;
   
@@ -270,7 +345,7 @@ void corta_rgb(Img& imagem, Img& img_saida, int li, int ci, int lf, int cf) {
   }
 }
 
-void binariza_canal(Img& img_in, Img& img_out, int limiar) {
+void binariza_canal(Img img_in, Img& img_out, int limiar) {
   img_out.qtd_linhas = img_in.qtd_linhas;
   img_out.qtd_colunas = img_in.qtd_colunas;
   for (int i = 0; i < img_out.qtd_linhas; i++) {
@@ -299,7 +374,41 @@ void binariza_canal(Img& img_in, Img& img_out, int limiar) {
   }
 }
 
-void diminui_tamanho(Img& img_in, Img& img_out) {
+void solariza(Img img_in, Img& img_out, int limiar) {
+  img_out.qtd_linhas = img_in.qtd_linhas;
+  img_out.qtd_colunas = img_in.qtd_colunas;
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      img_out.matriz[i][j] = {
+        img_in.matriz[i][j].red < limiar ? (255 - img_in.matriz[i][j].red) : img_in.matriz[i][j].red,
+        img_in.matriz[i][j].green < limiar ? (255 - img_in.matriz[i][j].green) : img_in.matriz[i][j].green,
+        img_in.matriz[i][j].blue < limiar ? (255 - img_in.matriz[i][j].blue) : img_in.matriz[i][j].blue
+      };
+    }
+  }
+}
+
+void rotaciona(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_colunas;
+  img_out.qtd_colunas = img_in.qtd_linhas;
+  for (int i = 0; i < img_in.qtd_linhas; i++) {
+    for (int j = 0; j < img_in.qtd_colunas; j++) {
+      img_out.matriz[j][img_in.qtd_linhas - i - 1] = img_in.matriz[i][j];
+    }
+  }
+}
+
+void inverte(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_colunas;
+  img_out.qtd_colunas = img_in.qtd_linhas;
+  for (int i = 0; i < img_in.qtd_linhas; i++) {
+    for (int j = 0; j < img_in.qtd_colunas; j++) {
+      img_out.matriz[img_in.qtd_linhas - i - 1][j] = img_in.matriz[i][j];
+    }
+  }
+}
+
+void diminui_tamanho(Img img_in, Img& img_out) {
   img_out.qtd_linhas = img_in.qtd_linhas / 2;
   img_out.qtd_colunas = img_in.qtd_colunas / 2;
 
@@ -317,13 +426,12 @@ void diminui_tamanho(Img& img_in, Img& img_out) {
 }
 
 // Implementando reflexao horizontal
-void reflete(Img& img_in, Img& img_out) {
+void reflete(Img img_in, Img& img_out, int indice) {
   img_out.qtd_linhas = img_in.qtd_linhas;
   img_out.qtd_colunas = img_in.qtd_colunas;
   for (int i = 0; i < img_out.qtd_linhas; i++) {
-    int metade = img_out.qtd_colunas / 2;
     for (int j = 0; j < img_out.qtd_colunas; j++) {
-      if (j < metade) {
+      if (j < indice) {
         img_out.matriz[i][j] = img_in.matriz[i][img_out.qtd_colunas - j - 1]; 
       } else {
         img_out.matriz[i][j] = img_in.matriz[i][j]; 
@@ -332,7 +440,7 @@ void reflete(Img& img_in, Img& img_out) {
   }
 }
 
-void borra_imagem(Img& img_in, Img& img_out) {
+void borra_imagem(Img img_in, Img& img_out) {
   img_out.qtd_linhas = img_in.qtd_linhas;
   img_out.qtd_colunas = img_in.qtd_colunas;
 
@@ -369,7 +477,7 @@ void borra_imagem(Img& img_in, Img& img_out) {
   }
 }
 
-void equaliza_histograma(Img& img_in, Img& img_out) {
+void equaliza_histograma(Img img_in, Img& img_out) {
   img_out.qtd_linhas = img_in.qtd_linhas;
   img_out.qtd_colunas = img_in.qtd_colunas;
 
@@ -413,7 +521,7 @@ void equaliza_histograma(Img& img_in, Img& img_out) {
   }
 }
 
-void separa_canais(Img& img_in, Img& img_r, Img& img_g, Img& img_b) {
+void separa_canais(Img img_in, Img& img_r, Img& img_g, Img& img_b) {
   img_r.qtd_linhas = img_in.qtd_linhas;
   img_r.qtd_colunas = img_in.qtd_colunas;
 
@@ -424,7 +532,7 @@ void separa_canais(Img& img_in, Img& img_r, Img& img_g, Img& img_b) {
   img_b.qtd_colunas = img_in.qtd_colunas;
 
   for (int i = 0; i < img_in.qtd_linhas; i++) {
-    for (int j = 0; j < img_in.qtd_linhas; j++) {
+    for (int j = 0; j < img_in.qtd_colunas; j++) {
       Pixel pixel_r;
       Pixel pixel_g;
       Pixel pixel_b;
@@ -444,6 +552,97 @@ void separa_canais(Img& img_in, Img& img_r, Img& img_g, Img& img_b) {
       img_r.matriz[i][j] = pixel_r;
       img_g.matriz[i][j] = pixel_g;
       img_b.matriz[i][j] = pixel_b;
+    }
+  }
+}
+
+void aumenta_tamanho(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_linhas * 2 -1;
+  img_out.qtd_colunas = img_in.qtd_colunas * 2 - 1;
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      img_out.matriz[i * 2][j * 2] = img_in.matriz[i][j];
+    }
+  }
+
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      // Linha
+      if ((i == 0 || i == img_out.qtd_linhas - 1) && j % 2 != 0) {
+        Pixel anterior, proximo;
+        if (j - 1 >= 0) {
+          anterior = img_out.matriz[i][j - 1];
+        } else {
+          anterior = {0, 0, 0};
+        }
+        
+        if (j + 1 <= img_out.qtd_colunas - 1) {
+          proximo = img_out.matriz[i][j + 1];
+        } else {
+          proximo = {0, 0, 0};
+        }
+        img_out.matriz[i][j] = {
+          anterior.red + proximo.red,
+          anterior.green + proximo.green,
+          anterior.blue + proximo.blue,
+        };
+      }
+
+      // Coluna
+      if ((j == 0 || j == img_out.qtd_colunas - 1) && i % 2 != 0) {
+        Pixel anterior, proximo;
+        if (i - 1 >= 0) {
+          anterior = img_out.matriz[i - 1][j];
+        } else {
+          anterior = {0, 0, 0};
+        }
+        
+        if (i + 1 <= img_out.qtd_linhas - 1) {
+          proximo = img_out.matriz[i + 1][j];
+        } else {
+          proximo = {0, 0, 0};
+        }
+        img_out.matriz[i][j] = {
+          anterior.red + proximo.red / 2,
+          anterior.green + proximo.green / 2,
+          anterior.blue + proximo.blue / 2,
+        };
+      }
+    }
+  }
+
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      if (i > 0 && i < img_out.qtd_linhas - 1 && i % 2 != 0
+        && j > 0 && j < img_out.qtd_colunas - 1 && j % 2 != 0) {
+        Pixel p1 = img_out.matriz[i - 1][j - 1];
+        Pixel p2 = img_out.matriz[i - 1][j + 1];
+        Pixel p3 = img_out.matriz[i + 1][j - 1];
+        Pixel p4 = img_out.matriz[i + 1][j + 1];
+        img_out.matriz[i][j] = {
+          (p1.red + p2.red + p3.red + p4.red) / 4,
+          (p1.green + p2.green + p3.green + p4.green) / 4,
+          (p1.blue + p2.blue + p3.blue + p4.blue) / 4
+        };
+      }
+    }
+  }
+
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      int soma_indices = i + j + 1;
+      if (soma_indices % 2 == 0 && (i > 0 && i < img_out.qtd_linhas - 1
+        && j > 0 && j < img_out.qtd_colunas - 1)) {
+        Pixel p1 = img_out.matriz[i - 1][j];
+        Pixel p2 = img_out.matriz[i][j - 1];
+        Pixel p3 = img_out.matriz[i][j + 1];
+        Pixel p4 = img_out.matriz[i + 1][j];
+        img_out.matriz[i][j] = {
+          (p1.red + p2.red + p3.red + p4.red) / 4,
+          (p1.green + p2.green + p3.green + p4.green) / 4,
+          (p1.blue + p2.blue + p3.blue + p4.blue) / 4
+        };
+      }
     }
   }
 }
