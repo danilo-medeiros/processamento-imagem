@@ -39,6 +39,18 @@ void borra_imagem(Img& img_in, Img& img_out);
 void equaliza_histograma(Img& img_in, Img& img_out);
 void separa_canais(Img& img_in, Img& img_r, Img& img_g, Img& img_b);
 
+// Funcoes com mascaras:
+
+void computa_negativo_com_mascara(Img img_in, Img mascara, Img& img_out);
+
+// Mascaras:
+
+void ler_escolha_mascara(Img& mascara);
+void gerar_mascara_metade_direita(Img& img);
+void gerar_mascara_xadrez(Img& img);
+void gerar_mascara_primeiro_quadrante(Img& img);
+void gerar_mascara_barras(Img& img);
+
 int main() {
   cout << "\nProcessador de imagens ADL\n\nEscolha uma funcao:\n\n";
   bool rodar = true;
@@ -55,7 +67,22 @@ int main() {
     switch (escolha) {
       case 1:
         abre_img(nome_arquivo, imagem);
-        computa_negativo(imagem, img_saida);
+        char opcao_mascara;
+        cout << "Deseja aplicar mascara ? (s/n): ";
+        cin >> opcao_mascara;
+        if (opcao_mascara == 's') {
+          Img mascara;
+          mascara.qtd_linhas = imagem.qtd_linhas;
+          mascara.qtd_colunas = imagem.qtd_colunas;
+          ler_escolha_mascara(mascara);
+          computa_negativo_com_mascara(imagem, mascara, img_saida);
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          strcpy(nome_mascara, nome_arquivo);
+          strcat(nome_mascara, "_mascara");
+          salva_img(nome_mascara, mascara);
+        } else {
+          computa_negativo(imagem, img_saida);
+        }
         salva_img(nome_arquivo, img_saida);
         break;
       case 2:
@@ -223,11 +250,11 @@ void computa_negativo(Img img_in, Img& img_out) {
   img_out.qtd_colunas = img_in.qtd_colunas;
   for (int i = 0; i < img_out.qtd_linhas; i++) {
     for (int j = 0; j < img_out.qtd_colunas; j++) {
-      Pixel novo_pixel;
-      novo_pixel.red = 255 - img_in.matriz[i][j].red;
-      novo_pixel.green = 255 - img_in.matriz[i][j].green;
-      novo_pixel.blue = 255 - img_in.matriz[i][j].blue;
-      img_out.matriz[i][j] = novo_pixel;
+      img_out.matriz[i][j] = {
+        255 - img_in.matriz[i][j].red,
+        255 - img_in.matriz[i][j].green,
+        255 - img_in.matriz[i][j].blue
+      };
     }
   }
 }
@@ -321,9 +348,7 @@ void borra_imagem(Img& img_in, Img& img_out) {
         for (int l = pos_x - 1; l <= pos_x + 1; l++) {
           Pixel pixel;
           if (k < 0 || k >= img_out.qtd_linhas || l < 0 || l >= img_out.qtd_colunas) {
-            pixel.red = 0;
-            pixel.green = 0;
-            pixel.blue = 0;
+            pixel = { 0, 0, 0 };
           } else {
             pixel = img_in.matriz[k][l];
           }
@@ -335,9 +360,11 @@ void borra_imagem(Img& img_in, Img& img_out) {
           somatorio_blue += pixel.blue / 9;
         }
       }
-      img_out.matriz[i][j].green = somatorio_green;
-      img_out.matriz[i][j].red = somatorio_red;
-      img_out.matriz[i][j].blue = somatorio_blue;
+      img_out.matriz[i][j] = {
+        (int) somatorio_red,
+        (int) somatorio_green,
+        (int) somatorio_blue
+      };
     }
   }
 }
@@ -417,6 +444,113 @@ void separa_canais(Img& img_in, Img& img_r, Img& img_g, Img& img_b) {
       img_r.matriz[i][j] = pixel_r;
       img_g.matriz[i][j] = pixel_g;
       img_b.matriz[i][j] = pixel_b;
+    }
+  }
+}
+
+void computa_negativo_com_mascara(Img img_in, Img mascara, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_linhas;
+  img_out.qtd_colunas = img_in.qtd_colunas;
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      if (mascara.matriz[i][j].red == 255) {
+        img_out.matriz[i][j] = {
+          255 - img_in.matriz[i][j].red,
+          255 - img_in.matriz[i][j].green,
+          255 - img_in.matriz[i][j].blue
+        };  
+      } else {
+        img_out.matriz[i][j] = img_in.matriz[i][j];
+      }
+    }
+  }
+}
+
+void ler_escolha_mascara(Img& mascara) {
+  int escolha;
+  cout << "Escolha a mascara que deseja aplicar: \n";
+  cout << "[1] Metade direita\n[2] Xadrez\n[3] Primeiro quadrante\n[4] Barras\n";
+  cin >> escolha;
+  switch(escolha) {
+    case 1:
+      gerar_mascara_metade_direita(mascara);
+      break;
+    case 2:
+      gerar_mascara_xadrez(mascara);
+      break;
+    case 3:
+      gerar_mascara_primeiro_quadrante(mascara);
+      break;
+    case 4:
+      gerar_mascara_barras(mascara);
+      break;
+    default:
+      cout << "Opcao invalida\n";
+      break;
+  }
+}
+
+void gerar_mascara_metade_direita(Img& img) {
+  int metade = img.qtd_colunas / 2;
+  for (int i = 0; i < img.qtd_linhas; i++) {
+    for (int j = 0; j < img.qtd_colunas; j++) {
+      if (j < metade) {
+        img.matriz[i][j] = { 0, 0, 0 };
+      } else {
+        img.matriz[i][j] = { 255, 255, 255 };
+      }
+    }
+  }
+}
+
+void gerar_mascara_xadrez(Img& img) {
+  int largura_quadrado = img.qtd_colunas / 8;
+  int altura_quadrado = img.qtd_linhas / 8;
+  bool imprimir_branco = false;
+  for (int i = 0; i < img.qtd_linhas; i++) {
+    if (i % altura_quadrado == 2) {
+      imprimir_branco = !imprimir_branco;
+    }
+    for (int j = 0; j < img.qtd_colunas; j++) {
+      if (j % largura_quadrado == 0) {
+        imprimir_branco = !imprimir_branco;
+      }
+      if (imprimir_branco) {
+        img.matriz[i][j] = { 255, 255, 255 };
+      } else {
+        img.matriz[i][j] = { 0, 0, 0 };
+      }
+    }
+  }
+}
+
+void gerar_mascara_barras(Img& img) {
+  int largura_barra = img.qtd_colunas / 8;
+  bool imprimir_branco = false;
+  for (int i = 0; i < img.qtd_linhas; i++) {
+    for (int j = 0; j < img.qtd_colunas; j++) {
+      if (j % 30 == 0) {
+        imprimir_branco = !imprimir_branco;
+      }
+      if (imprimir_branco) {
+        img.matriz[i][j] = { 255, 255, 255 };
+      } else {
+        img.matriz[i][j] = { 0, 0, 0 };
+      }
+    }
+  }
+}
+
+void gerar_mascara_primeiro_quadrante(Img& img) {
+  int metade_altura = img.qtd_linhas / 2;
+  int metade_largura = img.qtd_colunas / 2;
+  for (int i = 0; i < img.qtd_linhas; i++) {
+    for (int j = 0; j < img.qtd_colunas; j++) {
+      if (i < metade_altura && j < metade_largura) {
+        img.matriz[i][j] = { 0, 0, 0 };
+      } else {
+        img.matriz[i][j] = { 255, 255, 255 };
+      }
     }
   }
 }
