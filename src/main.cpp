@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 using namespace std;
 
@@ -36,18 +37,22 @@ void binariza(Img img_in, Img& img_out, int limiar);
 void corta_rgb(Img imagem, Img& img_saida, int li, int ci, int lf, int cf);
 void binariza_canal(Img img_in, Img& img_out, int limiar);
 void solariza(Img img_in, Img& img_out, int limiar);
-void rotaciona(Img img_in, Img& img_out);
-void inverte(Img img_in, Img& img_out);
+void rotaciona_horario(Img img_in, Img& img_out);
+void rotaciona_antihorario(Img img_in, Img& img_out);
+void inverte_vertical(Img img_in, Img& img_out);
+void inverte_horizontal(Img img_in, Img& img_out);
 void diminui_tamanho(Img img_in, Img& img_out);
 void reflete(Img img_in, Img& img_out, int indice);
 void borra_imagem(Img img_in, Img& img_out);
 void equaliza_histograma(Img img_in, Img& img_out);
 void separa_canais(Img img_in, Img& img_r, Img& img_g, Img& img_b);
 void aumenta_tamanho(Img img_in, Img& img_out);
+void borra_imagem_variavel(Img img_in, Img& img_out, int s);
 
 // Funcoes com mascaras:
 
 void computa_negativo_com_mascara(Img img_in, Img mascara, Img& img_out);
+void binariza_com_mascara(Img img_in, Img& img_out, int limiar, Img mascara);
 
 // Mascaras:
 
@@ -56,6 +61,12 @@ void gerar_mascara_metade_direita(Img& img);
 void gerar_mascara_xadrez(Img& img);
 void gerar_mascara_primeiro_quadrante(Img& img);
 void gerar_mascara_barras(Img& img);
+void aplicar_mascara(Img img_in, Img& img_out, Img mascara);
+void gerar_mascara(char nome_mascara[], Img& mascara, char nome_arquivo[], Img imagem);
+
+// Helpers:
+int ler_limiar();
+bool deseja_aplicar_mascara();
 
 int main() {
   cout << "\nProcessador de imagens ADL\n\nEscolha uma funcao:\n\n";
@@ -69,26 +80,19 @@ int main() {
     char nome_arquivo[TAMANHO_MAXIMO_NOME_ARQUIVO];
     Img imagem;
     Img img_saida;
+    Img mascara;
 
     switch (escolha) {
       case 1:
         abre_img(nome_arquivo, imagem);
-        char opcao_mascara;
-        cout << "Deseja aplicar mascara ? (s/n): ";
-        cin >> opcao_mascara;
-        if (opcao_mascara == 's') {
-          Img mascara;
-          mascara.qtd_linhas = imagem.qtd_linhas;
-          mascara.qtd_colunas = imagem.qtd_colunas;
-          ler_escolha_mascara(mascara);
-          computa_negativo_com_mascara(imagem, mascara, img_saida);
+        computa_negativo(imagem, img_saida);
+        if (deseja_aplicar_mascara()) {
           char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
-          strcpy(nome_mascara, nome_arquivo);
-          strcat(nome_mascara, "_mascara");
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
           salva_img(nome_mascara, mascara);
-        } else {
-          computa_negativo(imagem, img_saida);
         }
+        strcat(nome_arquivo, "_negativo");
         salva_img(nome_arquivo, img_saida);
         break;
       case 2:
@@ -125,11 +129,12 @@ int main() {
         cout << "Linha final: ";
         cin >> lf;
         if (li < 0 || li >= imagem.qtd_linhas || lf <= 0 || lf > imagem.qtd_linhas
-          || ci < 0 || ci >= imagem.qtd_colunas || cf <= 0 || cf > imagem.qtd_colunas) {
-          cout << "\nERRO:\n\n===== Intervalo selecionado invalido =====\n\n";
-          break;
+          || ci < 0 || ci >= imagem.qtd_colunas || cf <= 0 || cf > imagem.qtd_colunas || ci >= cf || li >= lf) {
+          cout << "Intervalo selecionado invalido\n";
+          exit(EXIT_FAILURE);
         }
         corta_rgb(imagem, img_saida, li, ci, lf, cf);
+        strcat(nome_arquivo, "_recorte");
         salva_img(nome_arquivo, img_saida);
         break;
       case 4:
@@ -138,11 +143,19 @@ int main() {
         cout << "Limiar: ";
         cin >> limiar;
         binariza_canal(imagem, img_saida, limiar);
+        if (deseja_aplicar_mascara()) {
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
+          salva_img(nome_mascara, mascara);
+        }
+        strcat(nome_arquivo, "_binarizado_canal");
         salva_img(nome_arquivo, img_saida);
         break;
       case 5:
         abre_img(nome_arquivo, imagem);
         diminui_tamanho(imagem, img_saida);
+        strcat(nome_arquivo, "_reduzido");
         salva_img(nome_arquivo, img_saida);
         break;
       case 6:
@@ -150,30 +163,55 @@ int main() {
         cout << "Coluna de reflexao: \n";
         int indice;
         cin >> indice;
+        if (indice <= 0 || indice > imagem.qtd_colunas - 1) {
+          cout << "Coluna selecionada invalida\n";
+          exit(EXIT_FAILURE);
+        }
         reflete(imagem, img_saida, indice);
+        strcat(nome_arquivo, "_refletido");
         salva_img(nome_arquivo, img_saida);
         break;
       case 7:
         abre_img(nome_arquivo, imagem);
         borra_imagem(imagem, img_saida);
+        if (deseja_aplicar_mascara()) {
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
+          salva_img(nome_mascara, mascara);
+        }
+        strcat(nome_arquivo, "_borrado");
         salva_img(nome_arquivo, img_saida);
         break;
       case 8:
         abre_img(nome_arquivo, imagem);
         equaliza_histograma(imagem, img_saida);
+        strcat(nome_arquivo, "_equalizado");
         salva_img(nome_arquivo, img_saida);
         break;
       case 9:
         abre_img(nome_arquivo, imagem);
         converte_para_cinza(imagem, img_saida);
+        if (deseja_aplicar_mascara()) {
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
+          salva_img(nome_mascara, mascara);
+        }
+        strcat(nome_arquivo, "_escala_cinza");
         salva_img(nome_arquivo, img_saida);
         break;
       case 10:
         abre_img(nome_arquivo, imagem);
-        cout << "Limiar: ";
-        int limiar_binariza;
-        cin >> limiar_binariza;
-        binariza(imagem, img_saida, limiar_binariza);
+        binariza(imagem, img_saida, ler_limiar());
+
+        if (deseja_aplicar_mascara()) {
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
+          salva_img(nome_mascara, mascara);
+        }
+        strcat(nome_arquivo, "_binarizado");
         salva_img(nome_arquivo, img_saida);
         break;
       case 11:
@@ -182,26 +220,70 @@ int main() {
         int limiar_solariza;
         cin >> limiar_solariza;
         solariza(imagem, img_saida, limiar_solariza);
+
+        if (deseja_aplicar_mascara()) {
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
+          salva_img(nome_mascara, mascara);
+        }
+        strcat(nome_arquivo, "_solarizado");
         salva_img(nome_arquivo, img_saida);
         break;
       case 12:
         abre_img(nome_arquivo, imagem);
-        rotaciona(imagem, img_saida);
+        rotaciona_horario(imagem, img_saida);
+        strcat(nome_arquivo, "_rotacionado_horario");
         salva_img(nome_arquivo, img_saida);
         break;
       case 13:
         abre_img(nome_arquivo, imagem);
-        inverte(imagem, img_saida);
+        inverte_vertical(imagem, img_saida);
+        strcat(nome_arquivo, "_invertido_vertical");
         salva_img(nome_arquivo, img_saida);
         break;
       case 14:
         abre_img(nome_arquivo, imagem);
         aumenta_tamanho(imagem, img_saida);
+        strcat(nome_arquivo, "_aumentado");
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 15:
+        abre_img(nome_arquivo, imagem);
+        int s;
+        cout << "Tamanho da matriz do filtro: ";
+        cin >> s;
+        borra_imagem_variavel(imagem, img_saida, s);
+        if (deseja_aplicar_mascara()) {
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
+          salva_img(nome_mascara, mascara);
+        }
+        strcat(nome_arquivo, "_borrado_variavel");
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 16:
+        abre_img(nome_arquivo, imagem);
+        rotaciona_antihorario(imagem, img_saida);
+        strcat(nome_arquivo, "_rotacionado_antihorario");
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 17:
+        abre_img(nome_arquivo, imagem);
+        inverte_horizontal(imagem, img_saida);
+        strcat(nome_arquivo, "_invertido_horizontal");
         salva_img(nome_arquivo, img_saida);
         break;
       default:
         cout << "Opção inválida\n";
         break;
+    }
+    char escolha_final;
+    cout << "\nNovamente? (s/n): ";
+    cin >> escolha_final;
+    if (escolha_final != 's') {
+      break;
     }
   }
   cout << "Ate a proxima\n";
@@ -220,16 +302,16 @@ void abre_img(char nome[], Img& img) {
   arquivo.open(nome_arquivo);
 
   if (!arquivo.is_open()) {
-    cout << "Não foi possível abrir o arquivo\n";
-    return;
+    cout << "Não foi possível abrir o arquivo.\n";
+    exit(EXIT_FAILURE);
   }
 
   char tipo_arquivo[3];
   arquivo.getline(tipo_arquivo, 3);
 
-  cout << tipo_arquivo << endl;
   if (strcmp(tipo_arquivo, "P3") != 0) {
     cout << "Arquivo invalido. Deve ser um arquivo .ppm\n";
+    exit(EXIT_FAILURE);
     return;
   }
 
@@ -273,7 +355,7 @@ void salva_img(char nome[], Img img) {
     }
     arquivo_saida << "\n";
   }
-  cout << "Nome do arquivo de saida: " << nome_saida << endl;
+  cout << "ARQUIVO SALVO EM: " << nome_saida << endl;
   arquivo_saida.close();
 }
 
@@ -289,13 +371,34 @@ int ler_escolha_menu() {
   cout << "[9] Conversão para níveis de cinza\n";
   cout << "[10] Binarização de imagem (preto e branco)\n";
   cout << "[11] Solarização de imagem\n";
-  cout << "[12] Rotaciona\n";
-  cout << "[13] Inversão vertical na imagem (flip)\n";
+  cout << "[12] Rotaciona horario\n";
+  cout << "[13] Inversão vertical na imagem\n";
   cout << "[14] Aumento de tamanho da imagem\n";
-  cout << "[0] Sair\n\nSua opcao: ";
+  cout << "[15] Filtrar com passas baixas (Tamanho variável)\n";
+  cout << "[16] Rotaciona anti-horario\n";
+  cout << "[17] Inversão horizontal na imagem\n";
+  cout << "[0] Sair\nSua opcao: ";
   int escolha;
   cin >> escolha;
   return escolha;
+}
+
+int ler_limiar() {
+  int limiar;
+  cout << "Limiar: ";
+  cin >> limiar;
+  if (limiar <= 0 || limiar >= 255) {
+    cout << "Limiar deve ser entre 0 e 255\n";
+    exit(EXIT_FAILURE);
+  }
+  return limiar;
+}
+
+bool deseja_aplicar_mascara() {
+  char opcao_mascara;
+  cout << "Deseja aplicar mascara ? (s/n): ";
+  cin >> opcao_mascara;
+  return opcao_mascara == 's';
 }
 
 void converte_para_cinza(Img img_in, Img& img_out) {
@@ -389,7 +492,7 @@ void solariza(Img img_in, Img& img_out, int limiar) {
   }
 }
 
-void rotaciona(Img img_in, Img& img_out) {
+void rotaciona_horario(Img img_in, Img& img_out) {
   img_out.qtd_linhas = img_in.qtd_colunas;
   img_out.qtd_colunas = img_in.qtd_linhas;
   for (int i = 0; i < img_in.qtd_linhas; i++) {
@@ -399,12 +502,32 @@ void rotaciona(Img img_in, Img& img_out) {
   }
 }
 
-void inverte(Img img_in, Img& img_out) {
+void rotaciona_antihorario(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_colunas;
+  img_out.qtd_colunas = img_in.qtd_linhas;
+  for (int i = 0; i < img_in.qtd_linhas; i++) {
+    for (int j = 0; j < img_in.qtd_colunas; j++) {
+      img_out.matriz[img_in.qtd_colunas - 1 - j][i] = img_in.matriz[i][j];
+    }
+  }
+}
+
+void inverte_vertical(Img img_in, Img& img_out) {
   img_out.qtd_linhas = img_in.qtd_colunas;
   img_out.qtd_colunas = img_in.qtd_linhas;
   for (int i = 0; i < img_in.qtd_linhas; i++) {
     for (int j = 0; j < img_in.qtd_colunas; j++) {
       img_out.matriz[img_in.qtd_linhas - i - 1][j] = img_in.matriz[i][j];
+    }
+  }
+}
+
+void inverte_horizontal(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_colunas;
+  img_out.qtd_colunas = img_in.qtd_linhas;
+  for (int i = 0; i < img_in.qtd_linhas; i++) {
+    for (int j = 0; j < img_in.qtd_colunas; j++) {
+      img_out.matriz[i][img_in.qtd_linhas - j - 1] = img_in.matriz[i][j];
     }
   }
 }
@@ -462,11 +585,50 @@ void borra_imagem(Img img_in, Img& img_out) {
             pixel = img_in.matriz[k][l];
           }
           int pos_x_filtro = k - pos_x; 
-          int pos_y_filtro = k - pos_y;
+          int pos_y_filtro = l - pos_y;
 
           somatorio_green += pixel.green / 9;
           somatorio_red += pixel.red / 9;
           somatorio_blue += pixel.blue / 9;
+        }
+      }
+      img_out.matriz[i][j] = {
+        (int) somatorio_red,
+        (int) somatorio_green,
+        (int) somatorio_blue
+      };
+    }
+  }
+}
+
+void borra_imagem_variavel(Img img_in, Img& img_out, int s) {
+  img_out.qtd_linhas = img_in.qtd_linhas;
+  img_out.qtd_colunas = img_in.qtd_colunas;
+  float coeficiente = 1 / ((float) s * (float) s);
+
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    int pos_y = i;
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      int pos_x = j;
+
+      float somatorio_green = 0;
+      float somatorio_red = 0;
+      float somatorio_blue = 0;
+      int metade_s = s / 2;
+      for (int k = pos_y - metade_s; k <= pos_y + metade_s; k++) {
+        for (int l = pos_x - metade_s; l <= pos_x + metade_s; l++) {
+          Pixel pixel;
+          if (k < 0 || k >= img_out.qtd_linhas || l < 0 || l >= img_out.qtd_colunas) {
+            pixel = { 0, 0, 0 };
+          } else {
+            pixel = img_in.matriz[k][l];
+          }
+          int pos_x_filtro = k - pos_x;
+          int pos_y_filtro = l - pos_y;
+
+          somatorio_green += pixel.green * coeficiente;
+          somatorio_red += pixel.red * coeficiente;
+          somatorio_blue += pixel.blue * coeficiente;
         }
       }
       img_out.matriz[i][j] = {
@@ -648,28 +810,10 @@ void aumenta_tamanho(Img img_in, Img& img_out) {
   }
 }
 
-void computa_negativo_com_mascara(Img img_in, Img mascara, Img& img_out) {
-  img_out.qtd_linhas = img_in.qtd_linhas;
-  img_out.qtd_colunas = img_in.qtd_colunas;
-  for (int i = 0; i < img_out.qtd_linhas; i++) {
-    for (int j = 0; j < img_out.qtd_colunas; j++) {
-      if (mascara.matriz[i][j].red == 255) {
-        img_out.matriz[i][j] = {
-          255 - img_in.matriz[i][j].red,
-          255 - img_in.matriz[i][j].green,
-          255 - img_in.matriz[i][j].blue
-        };  
-      } else {
-        img_out.matriz[i][j] = img_in.matriz[i][j];
-      }
-    }
-  }
-}
-
 void ler_escolha_mascara(Img& mascara) {
   int escolha;
   cout << "Escolha a mascara que deseja aplicar: \n";
-  cout << "[1] Metade direita\n[2] Xadrez\n[3] Primeiro quadrante\n[4] Barras\n";
+  cout << "[1] Metade direita\n[2] Xadrez\n[3] Primeiro quadrante\n[4] Barras\nSua opcao: ";
   cin >> escolha;
   switch(escolha) {
     case 1:
@@ -706,7 +850,7 @@ void gerar_mascara_metade_direita(Img& img) {
 void gerar_mascara_xadrez(Img& img) {
   int largura_quadrado = img.qtd_colunas / 8;
   int altura_quadrado = img.qtd_linhas / 8;
-  bool imprimir_branco = false;
+  bool imprimir_branco = true;
   for (int i = 0; i < img.qtd_linhas; i++) {
     if (i % altura_quadrado == 2) {
       imprimir_branco = !imprimir_branco;
@@ -753,4 +897,22 @@ void gerar_mascara_primeiro_quadrante(Img& img) {
       }
     }
   }
+}
+
+void aplicar_mascara(Img img_in, Img& img_out, Img mascara) {
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      if (mascara.matriz[i][j].red == 0) {
+        img_out.matriz[i][j] = img_in.matriz[i][j];
+      }
+    }
+  }
+}
+
+void gerar_mascara(char nome_mascara[], Img& mascara, char nome_arquivo[], Img imagem) {
+  mascara.qtd_linhas = imagem.qtd_linhas;
+  mascara.qtd_colunas = imagem.qtd_colunas;
+  ler_escolha_mascara(mascara);
+  strcpy(nome_mascara, nome_arquivo);
+  strcat(nome_mascara, "_mascara");
 }
