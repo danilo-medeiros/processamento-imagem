@@ -224,10 +224,11 @@ void abre_img(char nome[], Img& img) {
     return;
   }
 
-  string tipo_arquivo;
-  getline(arquivo, tipo_arquivo);
+  char tipo_arquivo[3];
+  arquivo.getline(tipo_arquivo, 3);
 
-  if (tipo_arquivo != "P3") {
+  cout << tipo_arquivo << endl;
+  if (strcmp(tipo_arquivo, "P3") != 0) {
     cout << "Arquivo invalido. Deve ser um arquivo .ppm\n";
     return;
   }
