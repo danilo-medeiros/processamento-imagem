@@ -37,14 +37,17 @@ void binariza(Img img_in, Img& img_out, int limiar);
 void corta_rgb(Img imagem, Img& img_saida, int li, int ci, int lf, int cf);
 void binariza_canal(Img img_in, Img& img_out, int limiar);
 void solariza(Img img_in, Img& img_out, int limiar);
-void rotaciona(Img img_in, Img& img_out);
-void inverte(Img img_in, Img& img_out);
+void rotaciona_horario(Img img_in, Img& img_out);
+void rotaciona_antihorario(Img img_in, Img& img_out);
+void inverte_vertical(Img img_in, Img& img_out);
+void inverte_horizontal(Img img_in, Img& img_out);
 void diminui_tamanho(Img img_in, Img& img_out);
 void reflete(Img img_in, Img& img_out, int indice);
 void borra_imagem(Img img_in, Img& img_out);
 void equaliza_histograma(Img img_in, Img& img_out);
 void separa_canais(Img img_in, Img& img_r, Img& img_g, Img& img_b);
 void aumenta_tamanho(Img img_in, Img& img_out);
+void borra_imagem_variavel(Img img_in, Img& img_out, int s);
 
 // Funcoes com mascaras:
 
@@ -229,20 +232,47 @@ int main() {
         break;
       case 12:
         abre_img(nome_arquivo, imagem);
-        rotaciona(imagem, img_saida);
+        rotaciona_horario(imagem, img_saida);
         strcat(nome_arquivo, "_rotacionado_horario");
         salva_img(nome_arquivo, img_saida);
         break;
       case 13:
         abre_img(nome_arquivo, imagem);
-        inverte(imagem, img_saida);
-        strcat(nome_arquivo, "_invertido_x");
+        inverte_vertical(imagem, img_saida);
+        strcat(nome_arquivo, "_invertido_vertical");
         salva_img(nome_arquivo, img_saida);
         break;
       case 14:
         abre_img(nome_arquivo, imagem);
         aumenta_tamanho(imagem, img_saida);
         strcat(nome_arquivo, "_aumentado");
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 15:
+        abre_img(nome_arquivo, imagem);
+        int s;
+        cout << "Tamanho da matriz do filtro: ";
+        cin >> s;
+        borra_imagem_variavel(imagem, img_saida, s);
+        if (deseja_aplicar_mascara()) {
+          char nome_mascara[TAMANHO_MAXIMO_NOME_ARQUIVO];
+          gerar_mascara(nome_mascara, mascara, nome_arquivo, imagem);
+          aplicar_mascara(imagem, img_saida, mascara);
+          salva_img(nome_mascara, mascara);
+        }
+        strcat(nome_arquivo, "_borrado_variavel");
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 16:
+        abre_img(nome_arquivo, imagem);
+        rotaciona_antihorario(imagem, img_saida);
+        strcat(nome_arquivo, "_rotacionado_antihorario");
+        salva_img(nome_arquivo, img_saida);
+        break;
+      case 17:
+        abre_img(nome_arquivo, imagem);
+        inverte_horizontal(imagem, img_saida);
+        strcat(nome_arquivo, "_invertido_horizontal");
         salva_img(nome_arquivo, img_saida);
         break;
       default:
@@ -279,7 +309,6 @@ void abre_img(char nome[], Img& img) {
   char tipo_arquivo[3];
   arquivo.getline(tipo_arquivo, 3);
 
-  cout << tipo_arquivo << endl;
   if (strcmp(tipo_arquivo, "P3") != 0) {
     cout << "Arquivo invalido. Deve ser um arquivo .ppm\n";
     exit(EXIT_FAILURE);
@@ -342,9 +371,12 @@ int ler_escolha_menu() {
   cout << "[9] Conversão para níveis de cinza\n";
   cout << "[10] Binarização de imagem (preto e branco)\n";
   cout << "[11] Solarização de imagem\n";
-  cout << "[12] Rotaciona\n";
-  cout << "[13] Inversão vertical na imagem (flip)\n";
+  cout << "[12] Rotaciona horario\n";
+  cout << "[13] Inversão vertical na imagem\n";
   cout << "[14] Aumento de tamanho da imagem\n";
+  cout << "[15] Filtrar com passas baixas (Tamanho variável)\n";
+  cout << "[16] Rotaciona anti-horario\n";
+  cout << "[17] Inversão horizontal na imagem\n";
   cout << "[0] Sair\nSua opcao: ";
   int escolha;
   cin >> escolha;
@@ -460,7 +492,7 @@ void solariza(Img img_in, Img& img_out, int limiar) {
   }
 }
 
-void rotaciona(Img img_in, Img& img_out) {
+void rotaciona_horario(Img img_in, Img& img_out) {
   img_out.qtd_linhas = img_in.qtd_colunas;
   img_out.qtd_colunas = img_in.qtd_linhas;
   for (int i = 0; i < img_in.qtd_linhas; i++) {
@@ -470,12 +502,32 @@ void rotaciona(Img img_in, Img& img_out) {
   }
 }
 
-void inverte(Img img_in, Img& img_out) {
+void rotaciona_antihorario(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_colunas;
+  img_out.qtd_colunas = img_in.qtd_linhas;
+  for (int i = 0; i < img_in.qtd_linhas; i++) {
+    for (int j = 0; j < img_in.qtd_colunas; j++) {
+      img_out.matriz[img_in.qtd_colunas - 1 - j][i] = img_in.matriz[i][j];
+    }
+  }
+}
+
+void inverte_vertical(Img img_in, Img& img_out) {
   img_out.qtd_linhas = img_in.qtd_colunas;
   img_out.qtd_colunas = img_in.qtd_linhas;
   for (int i = 0; i < img_in.qtd_linhas; i++) {
     for (int j = 0; j < img_in.qtd_colunas; j++) {
       img_out.matriz[img_in.qtd_linhas - i - 1][j] = img_in.matriz[i][j];
+    }
+  }
+}
+
+void inverte_horizontal(Img img_in, Img& img_out) {
+  img_out.qtd_linhas = img_in.qtd_colunas;
+  img_out.qtd_colunas = img_in.qtd_linhas;
+  for (int i = 0; i < img_in.qtd_linhas; i++) {
+    for (int j = 0; j < img_in.qtd_colunas; j++) {
+      img_out.matriz[i][img_in.qtd_linhas - j - 1] = img_in.matriz[i][j];
     }
   }
 }
@@ -533,11 +585,50 @@ void borra_imagem(Img img_in, Img& img_out) {
             pixel = img_in.matriz[k][l];
           }
           int pos_x_filtro = k - pos_x; 
-          int pos_y_filtro = k - pos_y;
+          int pos_y_filtro = l - pos_y;
 
           somatorio_green += pixel.green / 9;
           somatorio_red += pixel.red / 9;
           somatorio_blue += pixel.blue / 9;
+        }
+      }
+      img_out.matriz[i][j] = {
+        (int) somatorio_red,
+        (int) somatorio_green,
+        (int) somatorio_blue
+      };
+    }
+  }
+}
+
+void borra_imagem_variavel(Img img_in, Img& img_out, int s) {
+  img_out.qtd_linhas = img_in.qtd_linhas;
+  img_out.qtd_colunas = img_in.qtd_colunas;
+  float coeficiente = 1 / ((float) s * (float) s);
+
+  for (int i = 0; i < img_out.qtd_linhas; i++) {
+    int pos_y = i;
+    for (int j = 0; j < img_out.qtd_colunas; j++) {
+      int pos_x = j;
+
+      float somatorio_green = 0;
+      float somatorio_red = 0;
+      float somatorio_blue = 0;
+      int metade_s = s / 2;
+      for (int k = pos_y - metade_s; k <= pos_y + metade_s; k++) {
+        for (int l = pos_x - metade_s; l <= pos_x + metade_s; l++) {
+          Pixel pixel;
+          if (k < 0 || k >= img_out.qtd_linhas || l < 0 || l >= img_out.qtd_colunas) {
+            pixel = { 0, 0, 0 };
+          } else {
+            pixel = img_in.matriz[k][l];
+          }
+          int pos_x_filtro = k - pos_x;
+          int pos_y_filtro = l - pos_y;
+
+          somatorio_green += pixel.green * coeficiente;
+          somatorio_red += pixel.red * coeficiente;
+          somatorio_blue += pixel.blue * coeficiente;
         }
       }
       img_out.matriz[i][j] = {
